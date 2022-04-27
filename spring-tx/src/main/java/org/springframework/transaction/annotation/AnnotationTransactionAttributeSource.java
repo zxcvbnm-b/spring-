@@ -1,0 +1,205 @@
+/*
+ * Copyright 2002-2018 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.springframework.transaction.annotation;
+
+import java.io.Serializable;
+import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+import org.springframework.lang.Nullable;
+import org.springframework.transaction.interceptor.AbstractFallbackTransactionAttributeSource;
+import org.springframework.transaction.interceptor.TransactionAttribute;
+import org.springframework.util.Assert;
+import org.springframework.util.ClassUtils;
+
+/**
+ * Implementation of the
+ * {@link org.springframework.transaction.interceptor.TransactionAttributeSource}
+ * interface for working with transaction metadata in JDK 1.5+ annotation format.
+ *
+ * <p>This class reads Spring's JDK 1.5+ {@link Transactional} annotation and
+ * exposes corresponding transaction attributes to Spring's transaction infrastructure.
+ * Also supports JTA 1.2's {@link javax.transaction.Transactional} and EJB3's
+ * {@link javax.ejb.TransactionAttribute} annotation (if present).
+ * This class may also serve as base class for a custom TransactionAttributeSource,
+ * or get customized through {@link TransactionAnnotationParser} strategies.
+ *
+ * @author Colin Sampaleanu
+ * @author Juergen Hoeller
+ * @since 1.2
+ * @see Transactional
+ * @see TransactionAnnotationParser
+ * @see SpringTransactionAnnotationParser
+ * @see Ejb3TransactionAnnotationParser
+ * @see org.springframework.transaction.interceptor.TransactionInterceptor#setTransactionAttributeSource
+ * @see org.springframework.transaction.interceptor.TransactionProxyFactoryBean#setTransactionAttributeSource
+ */
+@SuppressWarnings("serial")
+public class AnnotationTransactionAttributeSource extends AbstractFallbackTransactionAttributeSource
+		implements Serializable {
+
+	private static final boolean jta12Present;
+
+	private static final boolean ejb3Present;
+
+	static {
+		ClassLoader classLoader = AnnotationTransactionAttributeSource.class.getClassLoader();
+		jta12Present = ClassUtils.isPresent("javax.transaction.Transactional", classLoader);
+		ejb3Present = ClassUtils.isPresent("javax.ejb.TransactionAttribute", classLoader);
+	}
+    /*是否是只有公共方法使用事务*/
+	private final boolean publicMethodsOnly;
+    /*事务注解解析器，居然没有使用排序接口*/
+	private final Set<TransactionAnnotationParser> annotationParsers;
+
+
+	/**
+	 * Create a default AnnotationTransactionAttributeSource, supporting
+	 * public methods that carry the {@code Transactional} annotation
+	 * or the EJB3 {@link javax.ejb.TransactionAttribute} annotation.
+	 */
+	public AnnotationTransactionAttributeSource() {
+		this(true);
+	}
+
+	/**
+	 * Create a custom AnnotationTransactionAttributeSource, supporting
+	 * public methods that carry the {@code Transactional} annotation
+	 * or the EJB3 {@link javax.ejb.TransactionAttribute} annotation.
+	 * @param publicMethodsOnly whether to support public methods that carry
+	 * the {@code Transactional} annotation only (typically for use
+	 * with proxy-based AOP), or protected/private methods as well
+	 * (typically used with AspectJ class weaving)
+	 */
+	/*支持ejb的注解：TransactionAttribute 也支持springd的注解：Transaction*/
+	public AnnotationTransactionAttributeSource(boolean publicMethodsOnly) {
+		this.publicMethodsOnly = publicMethodsOnly;
+		if (jta12Present || ejb3Present) {
+			this.annotationParsers = new LinkedHashSet<>(4);
+			this.annotationParsers.add(new SpringTransactionAnnotationParser());
+			if (jta12Present) {
+				this.annotationParsers.add(new JtaTransactionAnnotationParser());
+			}
+			if (ejb3Present) {
+				this.annotationParsers.add(new Ejb3TransactionAnnotationParser());
+			}
+		}
+		else {
+			this.annotationParsers = Collections.singleton(new SpringTransactionAnnotationParser());
+		}
+	}
+
+	/**
+	 * Create a custom AnnotationTransactionAttributeSource.
+	 * @param annotationParser the TransactionAnnotationParser to use
+	 */
+	public AnnotationTransactionAttributeSource(TransactionAnnotationParser annotationParser) {
+		this.publicMethodsOnly = true;
+		Assert.notNull(annotationParser, "TransactionAnnotationParser must not be null");
+		this.annotationParsers = Collections.singleton(annotationParser);
+	}
+
+	/**
+	 * Create a custom AnnotationTransactionAttributeSource.
+	 * @param annotationParsers the TransactionAnnotationParsers to use
+	 */
+	public AnnotationTransactionAttributeSource(TransactionAnnotationParser... annotationParsers) {
+		this.publicMethodsOnly = true;
+		Assert.notEmpty(annotationParsers, "At least one TransactionAnnotationParser needs to be specified");
+		this.annotationParsers = new LinkedHashSet<>(Arrays.asList(annotationParsers));
+	}
+
+	/**
+	 * Create a custom AnnotationTransactionAttributeSource.
+	 * @param annotationParsers the TransactionAnnotationParsers to use
+	 *                          参数是事务注解的解析器，你也可以自己实现自己的事务解析器去操作解析你自己的事务源数据
+	 *                          本地事务默认使用：SpringTransactionAnnotationParser
+	 */
+	public AnnotationTransactionAttributeSource(Set<TransactionAnnotationParser> annotationParsers) {
+		this.publicMethodsOnly = true;
+		Assert.notEmpty(annotationParsers, "At least one TransactionAnnotationParser needs to be specified");
+		this.annotationParsers = annotationParsers;
+	}
+
+
+	@Override
+	@Nullable
+	protected TransactionAttribute findTransactionAttribute(Class<?> clazz) {
+		return determineTransactionAttribute(clazz);
+	}
+
+	@Override
+	@Nullable
+	protected TransactionAttribute findTransactionAttribute(Method method) {
+		return determineTransactionAttribute(method);
+	}
+
+	/**
+	 确定给定方法或类的事务属性。
+	 该实现委托配置
+	 * {@link TransactionAnnotationParser TransactionAnnotationParser}
+	 *用于将已知的注释解析为Spring的元数据属性类。
+	 *返回{@code null}如果它不是事务性的。
+	 可以被重写以支持带有事务元数据的自定义注解。
+	 * @param元素的注释方法或类
+
+	 * @返回已配置的事务属性，如果没有，则返回{@code null}
+	 */
+	/*确定事务属性--可以自己定义事务注解解析元数据  ，先解析成功的就立马返回了*/
+	@Nullable
+	protected TransactionAttribute determineTransactionAttribute(AnnotatedElement element) {
+		for (TransactionAnnotationParser annotationParser : this.annotationParsers) {
+			TransactionAttribute attr = annotationParser.parseTransactionAnnotation(element);
+			if (attr != null) {
+				return attr;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * 默认情况下，只有公共方法可以变成事务性的。
+	 */
+	@Override
+	protected boolean allowPublicMethodsOnly() {
+		return this.publicMethodsOnly;
+	}
+
+
+	@Override
+	public boolean equals(Object other) {
+		if (this == other) {
+			return true;
+		}
+		if (!(other instanceof AnnotationTransactionAttributeSource)) {
+			return false;
+		}
+		AnnotationTransactionAttributeSource otherTas = (AnnotationTransactionAttributeSource) other;
+		return (this.annotationParsers.equals(otherTas.annotationParsers) &&
+				this.publicMethodsOnly == otherTas.publicMethodsOnly);
+	}
+
+	@Override
+	public int hashCode() {
+		return this.annotationParsers.hashCode();
+	}
+
+}
