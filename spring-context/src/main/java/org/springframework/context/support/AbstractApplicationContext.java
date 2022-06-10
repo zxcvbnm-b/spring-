@@ -518,10 +518,10 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	@Override
 	public void refresh() throws BeansException, IllegalStateException {
 		synchronized (this.startupShutdownMonitor) {
-			// 准备用于刷新的上下文环境，将系统变量和环境变量设置到environment中去
+			// 1.准备用于刷新的上下文环境，将系统变量和环境变量设置到environment中去--初始化属性
 			prepareRefresh();
 
-			//告诉子类刷新内部bean工厂。
+			//告诉子类刷新内部bean工厂。返回BeanFactory实例对象
 			ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
 
 			// 准备在此上下文中使用的bean工厂。 这个工厂就是DefaultListableBeanFactory
@@ -533,9 +533,10 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				postProcessBeanFactory(beanFactory);
 
 				// 调用在上下文中注册为bean的工厂处理器。执行所有的postProcessBeanFactory接口的方法  所有处理器的postProcessBeanFactory回调。 前面执行的是postProcessBeanDefinitionRegistry方法
-				/*除了注册bean 还有就是对beanFactory进行扩展的了，比如解析@Configration注解等比如org.springframework.context.annotation.ConfigurationClassPostProcessor*/
-				/*大多数的bean的定义信息其实已经在这里被解析*/
-				/*这里的BeanFactoryPostProcessor是手动设置进去的*/
+				/*除了注册bean 还有就是对beanFactory进行扩展的了，
+				比如解析@Configration注解等比如org.springframework.context.annotation.ConfigurationClassPostProcessor （本身也是一个postProcessBeanDefinitionRegistry ）/
+				 */
+				/*大多数的bean的定义信息其实已经在这里被解析和生成了*/
 				invokeBeanFactoryPostProcessors(beanFactory);
 
 				// Register bean processors that intercept bean creation.
@@ -555,7 +556,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 				// Check for listener beans and register them.
 				registerListeners();
 
-				// 实例化所有剩余的(非lazy-init)单例 单例对象呢？ 使用代理？
+				// 实例化所有剩余的(非lazy-init)单例
 				finishBeanFactoryInitialization(beanFactory);
 
 				// Last step: publish corresponding event.
@@ -715,6 +716,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	 * <p>Must be called before singleton instantiation.
 	 */
 	protected void invokeBeanFactoryPostProcessors(ConfigurableListableBeanFactory beanFactory) {
+		/*这里的getBeanFactoryPostProcessors是手动设置进去的，一般是空的吧*/
 		PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(beanFactory, getBeanFactoryPostProcessors());
 
 		// Detect a LoadTimeWeaver and prepare for weaving, if found in the meantime
@@ -871,7 +873,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		// Register a default embedded value resolver if no bean post-processor
 		// (such as a PropertyPlaceholderConfigurer bean) registered any before:
 		// at this point, primarily for resolution in annotation attribute values.
-		/*用于解析注解的${}的解析器，参数来自environment*/
+		/*添加环境解析器 用于解析注解的${}的解析器，参数来自environment  这个环境解析器保存了一些我们导入的配置文件*/
 		if (!beanFactory.hasEmbeddedValueResolver()) {
 			beanFactory.addEmbeddedValueResolver(strVal -> getEnvironment().resolvePlaceholders(strVal));
 		}

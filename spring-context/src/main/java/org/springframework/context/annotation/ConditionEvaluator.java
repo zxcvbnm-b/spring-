@@ -106,7 +106,7 @@ class ConditionEvaluator {
 		}
 
 		AnnotationAwareOrderComparator.sort(conditions);
-        /*如果有一个condition匹配，那么就返回，然后跳过这个配置*/
+        /*如果有一个condition匹配，那么就返回，然后跳过这个配置类 不处理这个配置类了*/
 		for (Condition condition : conditions) {
 			ConfigurationPhase requiredPhase = null;
 			if (condition instanceof ConfigurationCondition) {

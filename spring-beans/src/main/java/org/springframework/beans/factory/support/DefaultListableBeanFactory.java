@@ -1207,14 +1207,16 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		}
 	}
     /*真正去解析依赖---整体逻辑：
-    1.先处理@Value注解的情况--1.1根据spring容器中的配置文件的值，解析@Value里面的表达式，获取真正的配置值。1.2 从bean定义信息里面再解析一次
-    1.3类型转换器转换
+    1.先处理@Value注解的情况--
+      1.1根据spring容器中的配置文件的值，解析@Value里面的表达式，获取真正的配置值。
+      1.2 从bean定义信息里面再解析一次
+      1.3类型转换器转换
     2.处理@Autowired
-    2.1如果字段值需要的是集合或者数组，那么直接根据类型得到之后返回
-    2.2如果只是对象类型，那么根据类型获取到所有此类型的对象，如果有@Autowired+@Qualifier的组合，那么加入到候选中，后续操作基于此返回的数据
-    2.3如果只是对象类型，那么，先根据类型获取所有此类型的对象，如果找不到，但是又是必须的，那么直接报错。
-    如果找到多个，然后遍历判断是否是有Primary的bean值,如果是，那么返回这个，如果没有Primary的，那么根据名称来注入，如果名称也没有匹配的，那么直接报错。
-    2.4 如果只有一个匹配，那么返回即可。
+      2.1如果字段值需要的是集合或者数组，那么直接根据类型查找bean名称，再遍历bean名称得到对象之后返回（如果是Map，只处理Map<String,xxx>类型的Map，会根据xxx类型查找bean名称，再遍历bean名称得到对象之后返回，map的key是Bean名称）
+      2.2如果只是对象类型，那么根据类型获取到所有此类型的对象，那么加入到候选中，后续操作基于此返回的数据
+      2.3如果只是对象类型，那么，先根据类型获取所有此类型的对象，如果找不到，但是又是必须的，那么直接报错。
+      如果找到多个，然后遍历判断是否是有@Primary/@Priority的bean值,如果是，那么返回这个，如果没有Primary的，那么根据名称来注入，如果名称也没有匹配的，那么直接报错。
+      2.4 如果只有一个匹配，那么返回即可。
       */
 	@Nullable
 	public Object doResolveDependency(DependencyDescriptor descriptor, @Nullable String beanName,
@@ -1229,7 +1231,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			}
             /*获取参数/字段的依赖类型，如果是方法呢？*/
 			Class<?> type = descriptor.getDependencyType();
-			/*获取@Value注解的值，如果返回值是字符串，那么解析方法参数@Value注解里面的值*/
+			/* TODO 获取@Value注解的值，如果返回值是字符串，那么解析方法参数@Value注解里面的值  getAutowireCandidateResolver的返回值会根据参数不同变化？ */
 			Object value = getAutowireCandidateResolver().getSuggestedValue(descriptor);
 			if (value != null) {
 				if (value instanceof String) {
@@ -1237,7 +1239,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 					String strVal = resolveEmbeddedValue((String) value);
 					BeanDefinition bd = (beanName != null && containsBean(beanName) ?
 							getMergedBeanDefinition(beanName) : null);
-					/*再次解析， 从bean定义中，值的来源是bean定义中，而不是配置文件等了TODO*/
+					/*再次解析， 从bean定义中，值的来源是bean定义中，而不是配置文件等了 TODO*/
 					value = evaluateBeanDefinitionString(strVal, bd);
 				}
 				TypeConverter converter = (typeConverter != null ? typeConverter : getTypeConverter());
@@ -1252,12 +1254,13 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 							converter.convertIfNecessary(value, type, descriptor.getMethodParameter()));
 				}
 			}
-            /*查找跟类型匹配的bean --如果需要注入的字段值是数组或者集合，那么走这，比如@Autowired List<UserService> test;*/
+            /*查找跟类型匹配的bean --如果需要注入的方法参数是数组或者集合，那么走这，比如 List<UserService> test; 那么会找到所有UserService类型的bean  ，
+            如果是Map<String,xxxx>，那么会找到所有xxxx类型的bean放入 如果key不是String，那么不处理，因为String是bean的名称*/
 			Object multipleBeans = resolveMultipleBeans(descriptor, beanName, autowiredBeanNames, typeConverter);
 			if (multipleBeans != null) {
 				return multipleBeans;
 			}
-
+            //获取候选bean
 			Map<String, Object> matchingBeans = findAutowireCandidates(beanName, type, descriptor);
 			if (matchingBeans.isEmpty()) {
 				/*如果找不到，又是必须要注入的bean 那么直接报错*/
@@ -1270,7 +1273,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			Object instanceCandidate;
             /*如果根据类型获取到多个bean，但是你只需要一个bean，那么可以根据bean的名称来定位*/
 			if (matchingBeans.size() > 1) {
-				/*获取主要的候选人对象：如果 候选的bean是Primary的，
+				/*获取主要的候选bean对象：如果 候选的bean是Primary的，
 				如果有多个，报错，如果只有一个，那么返回。如果不是Primary的，那么根据依赖字段的名称来作为autowiredBeanName的值*/
 				autowiredBeanName = determineAutowireCandidate(matchingBeans, descriptor);
 				if (autowiredBeanName == null) {
@@ -1390,6 +1393,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			}
 			return result;
 		}
+		//如果是Map，那么根据value的类型 找到所有的候选的bean对象
 		else if (Map.class == type) {
 			ResolvableType mapType = descriptor.getResolvableType().asMap();
 			Class<?> keyType = mapType.resolveGeneric(0);
@@ -1469,6 +1473,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		String[] candidateNames = BeanFactoryUtils.beanNamesForTypeIncludingAncestors(
 				this, requiredType, true, descriptor.isEager());
 		Map<String, Object> result = new LinkedHashMap<>(candidateNames.length);
+		//1.如果需要的是BeanFactory/应用上下文这种  那么。。。因为这种上下文不会被放入容器中
 		for (Map.Entry<Class<?>, Object> classObjectEntry : this.resolvableDependencies.entrySet()) {
 			Class<?> autowiringType = classObjectEntry.getKey();
 			if (autowiringType.isAssignableFrom(requiredType)) {
@@ -1482,9 +1487,9 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		}
 
 		for (String candidate : candidateNames) {
-			/*不是自己引用自己的而且有@Qualifier注解的才添加进去，这里如果匹配*/
+			/*不是自己引用自己的而且才添加进去，这里如果匹配   被覆盖变成了 ContextAnnotationAutowireCandidateResolver  */
 			if (!isSelfReference(beanName, candidate) && isAutowireCandidate(candidate, descriptor)) {
-				/*添加候选者实例对象到result中去*/
+				/*添加候选者实例对象到result中去--调用getBean('candidate')获取 */
 				addCandidateEntry(result, candidate, descriptor, requiredType);
 			}
 		}
@@ -1550,10 +1555,12 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	@Nullable
 	protected String determineAutowireCandidate(Map<String, Object> candidates, DependencyDescriptor descriptor) {
 		Class<?> requiredType = descriptor.getDependencyType();
+		//是不是判断是不是 Primary的的
 		String primaryCandidate = determinePrimaryCandidate(candidates, requiredType);
 		if (primaryCandidate != null) {
 			return primaryCandidate;
 		}
+		//是否高优先级 根据@Priority 来设置优先级
 		String priorityCandidate = determineHighestPriorityCandidate(candidates, requiredType);
 		if (priorityCandidate != null) {
 			return priorityCandidate;

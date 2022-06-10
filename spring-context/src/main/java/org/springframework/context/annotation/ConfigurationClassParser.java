@@ -240,7 +240,7 @@ class ConfigurationClassParser {
 			}
 		}
 
-		// 递归处理配置类及其超类层次结构。 先重本类开始
+		// 递归处理配置类及其超类层次结构。 先从本类开始
 		SourceClass sourceClass = asSourceClass(configClass);
 		do {
 			/*如果sourceClass返回值有值，那么说明当前这个configClass有父类 处理父类去了（不是说接口） */

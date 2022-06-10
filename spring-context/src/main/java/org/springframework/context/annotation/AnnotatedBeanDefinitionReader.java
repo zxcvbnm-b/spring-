@@ -46,6 +46,7 @@ import org.springframework.util.Assert;
  * @since 3.0
  * @see AnnotationConfigApplicationContext#register
  */
+/*提供注解方式加载bean定义信息。主要通过 注入了ConfigurationClassPostProcessor的bean定义（当然还有其他的bean定义，比如@AutoWired 的xxx后置处理器） */
 public class AnnotatedBeanDefinitionReader {
 
 	private final BeanDefinitionRegistry registry;

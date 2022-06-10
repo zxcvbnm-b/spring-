@@ -369,7 +369,7 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 		}
 		return (candidateConstructors.length > 0 ? candidateConstructors : null);
 	}
-     /*这里的pvs是bean定义里面的属性，不是容器中存储的那个属性值的源。*/
+     /*这里的pvs是bean定义里面已经被知道值的属性，不是容器中存储的那个属性值的源。*/
 	@Override
 	public PropertyValues postProcessProperties(PropertyValues pvs, Object bean, String beanName) {
 		/*从本类/父类中找有那两个注解的元数据信息*/
@@ -427,6 +427,7 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 		if (InjectionMetadata.needsRefresh(metadata, clazz)) {
 			synchronized (this.injectionMetadataCache) {
 				metadata = this.injectionMetadataCache.get(cacheKey);
+				//类型被改变，所以要清除原来已经设置好的属性。。。
 				if (InjectionMetadata.needsRefresh(metadata, clazz)) {
 					if (metadata != null) {
 						metadata.clear(pvs);
@@ -447,7 +448,7 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 			final List<InjectionMetadata.InjectedElement> currElements = new ArrayList<>();
             /*遍历这个类型的字段上有没有这两个注解*/
 			ReflectionUtils.doWithLocalFields(targetClass, field -> {
-				/*查看属性有没有@value或@Autowired注解*/
+				/*查看属性有没有@value或@Autowired等注解*/
 				AnnotationAttributes ann = findAutowiredAnnotation(field);
 				if (ann != null) {
 					/*不能是静态的属性*/
@@ -589,7 +590,7 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 		}
 
 		@Override
-		/*字段上有@Autowired和@value注解*/
+		/*字段上有@Autowired和@value等注解*/
 		protected void inject(Object bean, @Nullable String beanName, @Nullable PropertyValues pvs) throws Throwable {
 			Field field = (Field) this.member;
 			Object value;
@@ -607,7 +608,8 @@ public class AutowiredAnnotationBeanPostProcessor extends InstantiationAwareBean
 				/*转换器：*/
 				TypeConverter typeConverter = beanFactory.getTypeConverter();
 				try {
-					/*根据相应的类型转换器解析依赖 DependencyDescriptor：依赖描述 */
+					/*根据相应的类型转换器解析依赖 DependencyDescriptor：依赖描述 获取到目标属性对象  */
+					//解析规则  先根据字段的类型找到这个类型的所有bean实例 如果只有一个直接返回，如果有多个，那么匹配名称，如果相同，那么就取名称相同的，如果都不同而且有多个，那么直接报错。
 					value = beanFactory.resolveDependency(desc, beanName, autowiredBeanNames, typeConverter);
 				}
 				catch (BeansException ex) {

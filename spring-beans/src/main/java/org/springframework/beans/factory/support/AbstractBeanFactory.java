@@ -243,7 +243,9 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 		String beanName = transformedBeanName(name);
 		Object bean;
 
-		// 紧急检查单例缓存中是否有手动注册的单例。 从缓存中获取bean，或者获取正在循环引用的bean
+		// 紧急检查单例缓存中是否有手动注册的单例。 从缓存中获取bean，或者获取正在循环引用的bean .两个作用1.从缓存中获取bean 2.解决循环依赖，生成bean的AOP代理对象
+		//如果有一级缓存，那么说明bean在创建中，调用一级缓存的getObject方法创建当前bean的代理对象放入二级缓存返回
+		//一级缓存和二级缓存 只有一个会有值，因为 二级缓存是一级缓存调用getObject得到的结果，没有必要要一级缓存了
 		Object sharedInstance = getSingleton(beanName);
 		if (sharedInstance != null && args == null) {
 			if (logger.isTraceEnabled()) {
@@ -255,10 +257,13 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 					logger.trace("Returning cached instance of singleton bean '" + beanName + "'");
 				}
 			}
-			/*当name有&前缀而且sharedInstance是一个工厂bean的时候：1.sharedInstance是单例对象的的情况：对FactoryBean的处理 如果sharedInstance是一个FactoryBean那么检查FactoryBean缓存中有没有具体的实例，
+			/*当name没有&前缀而且sharedInstance是一个FactoryBean的时候：1.sharedInstance是单例对象的的情况：对FactoryBean的处理 如果sharedInstance是一个FactoryBean那么检查FactoryBean缓存中有没有具体的实例，
 			如果没有，那么就调用FactoryBean的GetObject方法去创建，然后调用然后调用bean初始化的后置处理器，再把具体的对象放入缓存中去 （如果sharedInstance是一个工厂bean） */
-			/*当name有&前缀而且sharedInstance是一个工厂bean的时候：2.如果不是单例，那么直接创建，然后调用bean初始化的后置处理器*/
-			/*TODO FactoryBean的这个 beanName 里面存的单例对象是哪个值，是FactoryBean这个对象本身还是 真实的bean呢？，*/
+
+			/*当name没有&前缀而且sharedInstance是一个FactoryBean的时候：2.如果不是单例，那么直接创建，然后调用bean初始化的后置处理器*/
+
+			/*当name有&前缀而且sharedInstance是一个FactoryBean的时候  说明你可能需要返回的是一个FactoryBean对象本身，而不是getObject后得到真正的对象*/
+			/*TODO FactoryBean的这个 beanName 里面存的单例对象是哪个值，是FactoryBean这个对象本身 真正的bean对象被缓存在 factoryBeanObjectCache*/
 			bean = getObjectForBeanInstance(sharedInstance, name, beanName, null);
 		}
 
@@ -327,6 +332,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 
 				// Create bean instance. 创建单例bean
 				if (mbd.isSingleton()) {
+					//getSingleton两件事 ：1.调用createBean创建单例bean 2.把创建得到的bean放入三级缓存（一个Map容器）中，
 					sharedInstance = getSingleton(beanName, () -> {
 						try {
 							/*真正创建Bean的地方*/
@@ -340,6 +346,9 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 							throw ex;
 						}
 					});
+					//对于FactoryBean 有特殊的处理。如果是FactoryBean 1.如果name是带&前缀的，那么直接返回sharedInstance，因为说明你要获取的就是工厂bean本身。
+					//2.如果name不是带&前缀的，那么如果是多例的，那么就走每次都创建一个bean，并走初始化前后后置处理器。
+					//3.如果name不是带&前缀的，如果是单例的，那么尝试从factoryBeanObjectCache缓存中获取，如果有直接返回，如果没有调用FactoryBean getObject获取结果，放入factoryBeanObjectCache缓存。
 					bean = getObjectForBeanInstance(sharedInstance, name, beanName, mbd);
 				}
                 /*如果是原型的那么走这 */
@@ -361,7 +370,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 				}
 
 				else {
-					/*其他作用域--需要传入工厂*/
+					/*其他作用域*/
 					String scopeName = mbd.getScope();
 					if (!StringUtils.hasLength(scopeName)) {
 						throw new IllegalStateException("No scope name defined for bean ´" + beanName + "'");
@@ -1682,15 +1691,17 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 		// Now we have the bean instance, which may be a normal bean or a FactoryBean.
 		// If it's a FactoryBean, we use it to create a bean instance, unless the
 		// caller actually wants a reference to the factory.
+		//如果你使用的是&beanName 来获取bean ，那么直接返回 FactoryBean 对象本身，不获取getObject对象的值。
 		if (!(beanInstance instanceof FactoryBean) || BeanFactoryUtils.isFactoryDereference(name)) {
 			return beanInstance;
 		}
 
 		Object object = null;
 		if (mbd == null) {
-			/*尝试使用beanName从缓存中获取，如果能获取到那么就获取，不然就创建*/
+			/*尝试使用beanName从缓存中获取*/
 			object = getCachedObjectForFactoryBean(beanName);
 		}
+		/*如果能获取到那么就获取，不然就创建  调用getObject方法*/
 		if (object == null) {
 			// Return bean instance from factory.
 			FactoryBean<?> factory = (FactoryBean<?>) beanInstance;
