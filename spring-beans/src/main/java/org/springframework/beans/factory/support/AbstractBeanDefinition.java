@@ -136,7 +136,7 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 	 */
 	public static final String INFER_METHOD = "(inferred)";
 
-
+    //这个bean定义的类型是什么，比如要创建User的bean ，那么就是User.class
 	@Nullable
 	private volatile Object beanClass;
 
@@ -150,7 +150,7 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 	private int autowireMode = AUTOWIRE_NO;
 
 	private int dependencyCheck = DEPENDENCY_CHECK_NONE;
-
+    //所依赖的bean，如果有，那么先创建当前bean所依赖的bean
 	@Nullable
 	private String[] dependsOn;
 
@@ -159,31 +159,31 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 	private boolean primary = false;
 
 	private final Map<String, AutowireCandidateQualifier> qualifiers = new LinkedHashMap<>();
-
+    //实例化当前对象的回调，如果有的话，那么使用这个--非必须，beanClass也是非必须的，factoryMethodName也是非必须的
 	@Nullable
 	private Supplier<?> instanceSupplier;
 
 	private boolean nonPublicAccessAllowed = true;
 
 	private boolean lenientConstructorResolution = true;
-
+    //创建当前bean的工厂名称
 	@Nullable
 	private String factoryBeanName;
-
+    //创建当前bean的方法：创建bean的工厂方法 比如@Bean类型的bean定义就会被解析为这个
 	@Nullable
 	private String factoryMethodName;
 
 	@Nullable
 	private ConstructorArgumentValues constructorArgumentValues;
-
+	//用于进行属性注入，比如给创建完成之后的bean进行属性注入 跟@Autowired一样的作用
 	@Nullable
 	private MutablePropertyValues propertyValues;
 
 	private MethodOverrides methodOverrides = new MethodOverrides();
-
+    //初始化方法
 	@Nullable
 	private String initMethodName;
-
+    //摧毁bean回调方法
 	@Nullable
 	private String destroyMethodName;
 

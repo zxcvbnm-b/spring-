@@ -249,6 +249,11 @@ public abstract class ObjectUtils {
 	 * @param obj the object to append
 	 * @return the new array (of the same component type; never {@code null})
 	 */
+	public static void main(String[] args) {
+		Number[] a = new Integer[0];
+		Integer number = null;
+		addObjectToArray(a,number);
+	}
 	public static <A, O extends A> A[] addObjectToArray(@Nullable A[] array, @Nullable O obj) {
 		Class<?> compType = Object.class;
 		if (array != null) {

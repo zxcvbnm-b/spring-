@@ -180,6 +180,7 @@ import org.springframework.util.StringUtils;
  * @see org.springframework.core.io.ResourceLoader#getResource(String)
  * @see ClassLoader#getResources(String)
  */
+//用于实现路径资源的匹配
 public class PathMatchingResourcePatternResolver implements ResourcePatternResolver {
 
 	private static final Log logger = LogFactory.getLog(PathMatchingResourcePatternResolver.class);
@@ -279,12 +280,15 @@ public class PathMatchingResourcePatternResolver implements ResourcePatternResol
 		Assert.notNull(locationPattern, "Location pattern must not be null");
 		if (locationPattern.startsWith(CLASSPATH_ALL_URL_PREFIX)) {
 			// a class path resource (multiple resources for same name possible)
+			//判断classpath*:是不是一个可以匹配的资源，比如里面是否有 *,?,等
 			if (getPathMatcher().isPattern(locationPattern.substring(CLASSPATH_ALL_URL_PREFIX.length()))) {
 				// a class path resource pattern
 				return findPathMatchingResources(locationPattern);
 			}
 			else {
 				// all class path resources with the given name
+				//如果不能匹配，那么直接根据名称获取资源从classpath下（如果是文件夹，那么返回多个资源）
+				// CLASSPATH_ALL_URL_PREFIX和CLASSPATH_URL_PREFIX 的区别是：前者会扫描包含jar的情况和target\classes下的资源，后者只扫描：target\classes文件夹下的资源
 				return findAllClassPathResources(locationPattern.substring(CLASSPATH_ALL_URL_PREFIX.length()));
 			}
 		}

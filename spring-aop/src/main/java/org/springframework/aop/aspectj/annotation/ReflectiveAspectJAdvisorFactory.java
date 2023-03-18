@@ -121,7 +121,7 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
 				new LazySingletonAspectInstanceFactoryDecorator(aspectInstanceFactory);
 
 		List<Advisor> advisors = new ArrayList<>();
-		//获取所有方法，排除有注解：Pointcut的方法
+		//获取所有方法，排除有注解：Pointcut的方法  ？？那不是也包括普通方法了 ？普通方法返回InstantiationModelAwarePointcutAdvisorImpl的Advice
 		for (Method method : getAdvisorMethods(aspectClass)) {
 			/*构造代理InstantiationModelAwarePointcutAdvisorImpl的 Advisor实例对象 */
 			Advisor advisor = getAdvisor(method, lazySingletonAspectInstanceFactory, advisors.size(), aspectName);
@@ -256,7 +256,7 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
 					logger.debug("Processing pointcut '" + candidateAdviceMethod.getName() + "'");
 				}
 				return null;
-				//环绕通知  candidateAdviceMethod :带有@around注解的方法 ，expressionPointcut切入点表达式
+				//环绕通知 本身就实现了 MethodInterceptor  candidateAdviceMethod :带有@around注解的方法 ，expressionPointcut切入点表达式 需要手动调用 在切面通知方法里面手动调动mi.proceed()
 			case AtAround:
 				springAdvice = new AspectJAroundAdvice(
 						candidateAdviceMethod, expressionPointcut, aspectInstanceFactory);
@@ -266,7 +266,7 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
 				springAdvice = new AspectJMethodBeforeAdvice(
 						candidateAdviceMethod, expressionPointcut, aspectInstanceFactory);
 				break;
-				//后置通知
+				//后置通知  本身就实现了 MethodInterceptor
 			case AtAfter:
 				springAdvice = new AspectJAfterAdvice(
 						candidateAdviceMethod, expressionPointcut, aspectInstanceFactory);
@@ -297,7 +297,7 @@ public class ReflectiveAspectJAdvisorFactory extends AbstractAspectJAdvisorFacto
 		// Now to configure the advice...
 		springAdvice.setAspectName(aspectName);
 		springAdvice.setDeclarationOrder(declarationOrder);
-		//生成参数通知名称？TODO
+		//获取参数名称
 		String[] argNames = this.parameterNameDiscoverer.getParameterNames(candidateAdviceMethod);
 		if (argNames != null) {
 			springAdvice.setArgumentNamesFromStringArray(argNames);

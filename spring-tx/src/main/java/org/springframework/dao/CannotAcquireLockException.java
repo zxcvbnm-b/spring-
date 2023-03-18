@@ -16,6 +16,8 @@
 
 package org.springframework.dao;
 
+import org.springframework.transaction.interceptor.TransactionInterceptor;
+
 /**
  * Exception thrown on failure to acquire a lock during an update,
  * for example during a "select for update" statement.

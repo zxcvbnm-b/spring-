@@ -43,6 +43,7 @@ import org.springframework.util.Assert;
  * @since 2.5
  * @see AopNamespaceUtils
  */
+//注册创建代理bean 的aop 自动代理相关的bean
 public abstract class AopConfigUtils {
 
 	/**

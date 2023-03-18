@@ -94,7 +94,7 @@ public class AnnotationAwareAspectJAutoProxyCreator extends AspectJAwareAdvisorA
 		// Build Advisors for all AspectJ aspects in the bean factory
 		//获取所有的@Aspect注解方式的，如果有，那么会把切面类里面每一个通知方法都转换为InstantiationModelAwarePointcutAdvisorImpl类型的 Advisor.
 		if (this.aspectJAdvisorsBuilder != null) {
-			/*xxxxx*/
+			/*获取所有切面的 所有的通知并封装成Advisor */
 			advisors.addAll(this.aspectJAdvisorsBuilder.buildAspectJAdvisors());
 		}
 		return advisors;

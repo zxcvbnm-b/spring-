@@ -31,7 +31,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.transaction.PlatformTransactionManager;
 
 /**
- 用于声明性事务的AOP联盟方法拦截器
+ 用于声明性事务的AOP联盟方法拦截器---实现事务的主要类
  *使用公共Spring事务基础设施的管理
  * ({@link org.springframework.transaction.PlatformTransactionManager}).
  *
@@ -92,6 +92,7 @@ public class TransactionInterceptor extends TransactionAspectSupport implements 
 		// Work out the target class: may be {@code null}.
 		// The TransactionAttributeSource should be passed the target class
 		// as well as the method, which may be from an interface.
+		//获取被代理目标class对象，
 		Class<?> targetClass = (invocation.getThis() != null ? AopUtils.getTargetClass(invocation.getThis()) : null);
 
 		// Adapt to TransactionAspectSupport's invokeWithinTransaction...

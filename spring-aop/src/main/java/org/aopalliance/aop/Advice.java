@@ -23,6 +23,7 @@ package org.aopalliance.aop;
  * @author Rod Johnson
  * @version $Id: Advice.java,v 1.1 2004/03/19 17:02:16 johnsonr Exp $
  */
+//只是一个标记接口 标记这个类为一个通知
 public interface Advice {
 
 }

@@ -45,6 +45,7 @@ import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.config.PropertyPlaceholderConfigurer;
 import org.springframework.beans.factory.config.SmartInstantiationAwareBeanPostProcessor;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
@@ -352,11 +353,11 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 			return bean;
 		}
 
-		//创建代理，如果有advice 查找是否有符合的advice如果有，那么才进行创建代理。
+		//创建代理，如果有Advice 查找是否有符合的Advice如果有，那么才进行创建代理。
 		Object[] specificInterceptors = getAdvicesAndAdvisorsForBean(bean.getClass(), beanName, null);
 		if (specificInterceptors != DO_NOT_PROXY) {
 			this.advisedBeans.put(cacheKey, Boolean.TRUE);
-			/*创建代理类*/
+			/*创建代理类 植入通知/Advisor到代理bean*/
 			Object proxy = createProxy(
 					bean.getClass(), beanName, specificInterceptors, new SingletonTargetSource(bean));
 			this.proxyTypes.put(cacheKey, proxy.getClass());
@@ -455,23 +456,25 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 		if (this.beanFactory instanceof ConfigurableListableBeanFactory) {
 			AutoProxyUtils.exposeTargetClass((ConfigurableListableBeanFactory) this.beanFactory, beanName, beanClass);
 		}
-
+        // ProxyFactory是方法级别的，但是Advisor是单例的。
 		ProxyFactory proxyFactory = new ProxyFactory();
 		proxyFactory.copyFrom(this);
 
 		if (!proxyFactory.isProxyTargetClass()) {
 			/*查看bean定义的属性中是否有preserveTargetClass属性，而且为true  org.springframework.aop.framework.autoproxy.AutoProxyUtils.preserveTargetClass的值*/
 			if (shouldProxyTargetClass(beanClass, beanName)) {
-				proxyFactory.setProxyTargetClass(true);
+				proxyFactory.setProxyTargetClass(true);//如果是true，那么会使用CGLIB代理
 			}
-			/*如果没有，那么判断如果有合适的接口（合适的接口为不是那种Aware啥的的接口）如果有就顺便把值设置到ProxyFactory了*/
+			/*如果没有，那么判断如果有合适的接口（合适的接口为不是那种Aware啥的的接口）如果有就顺便把值设置到ProxyFactory了，否则直接使用CGLIB代理*/
 			else {
 				evaluateProxyInterfaces(beanClass, proxyFactory);
 			}
 		}
 
 		Advisor[] advisors = buildAdvisors(beanName, specificInterceptors);
+		//符合当前bean的Advisor
 		proxyFactory.addAdvisors(advisors);
+		//包装了当前bean的 对象
 		proxyFactory.setTargetSource(targetSource);
 		customizeProxyFactory(proxyFactory);
 
@@ -545,6 +548,7 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 		}
 
 		Advisor[] advisors = new Advisor[allInterceptors.size()];
+		//包装 Advisor
 		for (int i = 0; i < allInterceptors.size(); i++) {
 			/*重新包装*/
 			advisors[i] = this.advisorAdapterRegistry.wrap(allInterceptors.get(i));

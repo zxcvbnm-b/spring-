@@ -242,9 +242,10 @@ public abstract class ClassUtils {
 			throws ClassNotFoundException, LinkageError {
 
 		Assert.notNull(name, "Name must not be null");
-
+		// 如果传入的是基本类型，那么从基本类型的缓存中获取其包装类型 比如传入 int 那么返回Integer.class
 		Class<?> clazz = resolvePrimitiveClassName(name);
 		if (clazz == null) {
+			//从缓存中获取
 			clazz = commonClassCache.get(name);
 		}
 		if (clazz != null) {
@@ -252,20 +253,21 @@ public abstract class ClassUtils {
 		}
 
 		// "java.lang.String[]" style arrays
+		//如果是数组类型
 		if (name.endsWith(ARRAY_SUFFIX)) {
 			String elementClassName = name.substring(0, name.length() - ARRAY_SUFFIX.length());
 			Class<?> elementClass = forName(elementClassName, classLoader);
 			return Array.newInstance(elementClass, 0).getClass();
 		}
 
-		// "[Ljava.lang.String;" style arrays
+		// "[Ljava.lang.String;" style arrays 如果是数组类型
 		if (name.startsWith(NON_PRIMITIVE_ARRAY_PREFIX) && name.endsWith(";")) {
 			String elementName = name.substring(NON_PRIMITIVE_ARRAY_PREFIX.length(), name.length() - 1);
 			Class<?> elementClass = forName(elementName, classLoader);
 			return Array.newInstance(elementClass, 0).getClass();
 		}
 
-		// "[[I" or "[[Ljava.lang.String;" style arrays
+		// "[[I" or "[[Ljava.lang.String;" style arrays 如果是数组类型
 		if (name.startsWith(INTERNAL_ARRAY_PREFIX)) {
 			String elementName = name.substring(INTERNAL_ARRAY_PREFIX.length());
 			Class<?> elementClass = forName(elementName, classLoader);
@@ -280,6 +282,7 @@ public abstract class ClassUtils {
 			return Class.forName(name, false, clToUse);
 		}
 		catch (ClassNotFoundException ex) {
+			//尝试解析判断是不是内部类
 			int lastDotIndex = name.lastIndexOf(PACKAGE_SEPARATOR);
 			if (lastDotIndex != -1) {
 				String innerClassName =

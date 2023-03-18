@@ -65,7 +65,7 @@ public final class Conventions {
 		Assert.notNull(value, "Value must not be null");
 		Class<?> valueClass;
 		boolean pluralize = false;
-
+        //如果是数组，那么或者数组元素类型。
 		if (value.getClass().isArray()) {
 			valueClass = value.getClass().getComponentType();
 			pluralize = true;

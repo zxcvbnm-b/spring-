@@ -339,6 +339,7 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 	 */
 	@Override
 	public final TransactionStatus getTransaction(@Nullable TransactionDefinition definition) throws TransactionException {
+		//获取事务对象，包含数据连接在内
 		Object transaction = doGetTransaction();
 
 		// Cache debug flag to avoid repeated checks.
@@ -348,7 +349,8 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 			// Use defaults if no transaction definition given.
 			definition = new DefaultTransactionDefinition();
 		}
-
+//当前是否是已经存在的事务--默认使用的是DataSourceTransactionManager，所以主要判断事务对象中是否是使用同一个数据库连接
+		//如果已经存在，那么查看是否符合事务隔离级别处理
 		if (isExistingTransaction(transaction)) {
 			// Existing transaction found -> check propagation behavior to find out how to behave.
 			return handleExistingTransaction(definition, transaction, debugEnabled);
@@ -360,6 +362,7 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 		}
 
 		// No existing transaction found -> check propagation behavior to find out how to proceed.
+		//如果当前不存在事务，而且事务隔离级别为强制的，那么直接抛出异常
 		if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_MANDATORY) {
 			throw new IllegalTransactionStateException(
 					"No existing transaction found for transaction marked with propagation 'mandatory'");
@@ -375,7 +378,9 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 				boolean newSynchronization = (getTransactionSynchronization() != SYNCHRONIZATION_NEVER);
 				DefaultTransactionStatus status = newTransactionStatus(
 						definition, transaction, true, newSynchronization, debugEnabled, suspendedResources);
+				//开启新事务 ，关闭自动提交等--由底层实现
 				doBegin(transaction, definition);
+				//当前事务和当前线程绑定
 				prepareSynchronization(status, definition);
 				return status;
 			}
@@ -401,33 +406,40 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 	private TransactionStatus handleExistingTransaction(
 			TransactionDefinition definition, Object transaction, boolean debugEnabled)
 			throws TransactionException {
-
+         //如果事务隔离级别为不使用事务，那么当前存在事务的话，那么直接抛出异常
 		if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NEVER) {
 			throw new IllegalTransactionStateException(
 					"Existing transaction found for transaction marked with propagation 'never'");
 		}
-
+          //当前不支持事务，那么直接挂起事务
 		if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NOT_SUPPORTED) {
 			if (debugEnabled) {
 				logger.debug("Suspending current transaction");
 			}
+			//挂起事务
 			Object suspendedResources = suspend(transaction);
 			boolean newSynchronization = (getTransactionSynchronization() == SYNCHRONIZATION_ALWAYS);
 			return prepareTransactionStatus(
 					definition, null, false, newSynchronization, debugEnabled, suspendedResources);
 		}
-
+//如果是PROPAGATION_REQUIRES_NEW的隔离级别，那么挂起当前事务，新建新的事务，当当前事务执行完成之后，通过oldTransactionInfo恢复之前的事务
 		if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_REQUIRES_NEW) {
 			if (debugEnabled) {
 				logger.debug("Suspending current transaction, creating new transaction with name [" +
 						definition.getName() + "]");
 			}
+			//挂起资源--清空当前事务状态，--挂起当前事务，然后开启新事务，，原来的事务可以从之前的TransactionInfo的oldTransactionInfo获取，
+			// 想象方法执行的流程，上一个方法中TransactionInfo保存了一个oldTransactionInfo对象
+
 			SuspendedResourcesHolder suspendedResources = suspend(transaction);
+              //开启新事务 后续使用新的数据库连接了 那不是有可能一个线程占用多个数据库连接，对的，如果有多层嵌套的话。
 			try {
 				boolean newSynchronization = (getTransactionSynchronization() != SYNCHRONIZATION_NEVER);
 				DefaultTransactionStatus status = newTransactionStatus(
 						definition, transaction, true, newSynchronization, debugEnabled, suspendedResources);
+				//只要调用这个方法，那么就是开启了一个新的事务
 				doBegin(transaction, definition);
+				//准备TransactionSynchronizationManager 设置当前事务状态
 				prepareSynchronization(status, definition);
 				return status;
 			}
@@ -529,12 +541,17 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 	 * Initialize transaction synchronization as appropriate.
 	 */
 	protected void prepareSynchronization(DefaultTransactionStatus status, TransactionDefinition definition) {
+		//是否是新建的事务
 		if (status.isNewSynchronization()) {
+			//默认为true，
 			TransactionSynchronizationManager.setActualTransactionActive(status.hasTransaction());
+			//当前的事务隔离级别
 			TransactionSynchronizationManager.setCurrentTransactionIsolationLevel(
 					definition.getIsolationLevel() != TransactionDefinition.ISOLATION_DEFAULT ?
 							definition.getIsolationLevel() : null);
+			//事务是否只读
 			TransactionSynchronizationManager.setCurrentTransactionReadOnly(definition.isReadOnly());
+			//当前事务的名称----默认就是当前事务方法的全路径名比如：io.renren.modules.front.service.impl.CustomerMasterServiceImpl.sysQueryPage
 			TransactionSynchronizationManager.setCurrentTransactionName(definition.getName());
 			TransactionSynchronizationManager.initSynchronization();
 		}
@@ -574,6 +591,7 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 			try {
 				Object suspendedResources = null;
 				if (transaction != null) {
+					//DataSourceTransactionManager的做法是清空连接，从TransactionSynchronizationManager解绑
 					suspendedResources = doSuspend(transaction);
 				}
 				String name = TransactionSynchronizationManager.getCurrentTransactionName();

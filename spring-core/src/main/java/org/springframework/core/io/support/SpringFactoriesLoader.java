@@ -129,6 +129,7 @@ public final class SpringFactoriesLoader {
 		}
 
 		try {
+			//扫描所有jar包下的 META-INF/spring.factories文件
 			Enumeration<URL> urls = (classLoader != null ?
 					classLoader.getResources(FACTORIES_RESOURCE_LOCATION) :
 					ClassLoader.getSystemResources(FACTORIES_RESOURCE_LOCATION));
@@ -136,8 +137,10 @@ public final class SpringFactoriesLoader {
 			while (urls.hasMoreElements()) {
 				URL url = urls.nextElement();
 				UrlResource resource = new UrlResource(url);
+				//文件加载 可以加载xml或者key=value其他文件
 				Properties properties = PropertiesLoaderUtils.loadProperties(resource);
 				for (Map.Entry<?, ?> entry : properties.entrySet()) {
+					//factoryClassName 有很多种类型，比如自动配置类啊等等。org.springframework.boot.autoconfigure.EnableAutoConfiguration 或者说是org.springframework.context.ApplicationListener等  最多的还是自动配置类。
 					String factoryClassName = ((String) entry.getKey()).trim();
 					for (String factoryName : StringUtils.commaDelimitedListToStringArray((String) entry.getValue())) {
 						result.add(factoryClassName, factoryName.trim());

@@ -312,7 +312,7 @@ public abstract class AopUtils {
 		}
 		List<Advisor> eligibleAdvisors = new ArrayList<>();
 		for (Advisor candidate : candidateAdvisors) {
-			/*查看有没有合适的切入点*/
+			/* canApply(candidate, clazz) 查看有没有合适的切入点 如果只实现 了Advisor 接口 ，那肯定是没有的，但是会返回true*/
 			if (candidate instanceof IntroductionAdvisor && canApply(candidate, clazz)) {
 				eligibleAdvisors.add(candidate);
 			}
@@ -320,6 +320,7 @@ public abstract class AopUtils {
 		/*其他类型不是 IntroductionAdvisor类型的Advisor来执行*/
 		boolean hasIntroductions = !eligibleAdvisors.isEmpty();
 		for (Advisor candidate : candidateAdvisors) {
+			//已经处理过了 不处理了
 			if (candidate instanceof IntroductionAdvisor) {
 				// already processed
 				continue;

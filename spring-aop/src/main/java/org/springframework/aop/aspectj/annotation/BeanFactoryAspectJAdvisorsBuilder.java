@@ -89,7 +89,7 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 				if (aspectNames == null) {
 					List<Advisor> advisors = new ArrayList<>();
 					aspectNames = new ArrayList<>();
-					//获取所有bean
+					//获取所有bean名称
 					String[] beanNames = BeanFactoryUtils.beanNamesForTypeIncludingAncestors(
 							this.beanFactory, Object.class, true, false);
 					for (String beanName : beanNames) {
@@ -107,7 +107,9 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 						if (this.advisorFactory.isAspect(beanType)) {
 							aspectNames.add(beanName);
 							AspectMetadata amd = new AspectMetadata(beanType, beanName);
+							//一般走这 ，不会创建多个Aspect切面实例对象，使用的单例的方式getBean()
 							if (amd.getAjType().getPerClause().getKind() == PerClauseKind.SINGLETON) {
+								//BeanFactoryAspectInstanceFactory用于获取 Aspect切面实例对象，然后执行通知方法。所以 Aspect切面实例对象是线程共享的，如果有共享变量，那么不是线程安全的。
 								MetadataAwareAspectInstanceFactory factory =
 										new BeanFactoryAspectInstanceFactory(this.beanFactory, beanName);
 								//获取切面bean的所有的Advisor
@@ -121,7 +123,7 @@ public class BeanFactoryAspectJAdvisorsBuilder {
 								advisors.addAll(classAdvisors);
 							}
 							else {
-								// Per target or per this.
+								// 每一个目标或每一个这个。 这时 @Aspect 实例对象不能是单例的  就是每次执行一次通知方法就getBean一次这个切面实例
 								if (this.beanFactory.isSingleton(beanName)) {
 									throw new IllegalArgumentException("Bean with name '" + beanName +
 											"' is a singleton, but aspect instantiation model is not singleton");
